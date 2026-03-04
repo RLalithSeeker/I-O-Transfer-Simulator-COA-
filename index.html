@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>I/O Data Transfer Simulator | COA PBL</title>
+  <meta name="description" content="Interactive simulation comparing Programmed I/O, Interrupt-driven I/O, and DMA transfer techniques — COA Phase 1 PBL Project" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- ===== HEADER ===== -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="header-brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="8" width="10" height="16" rx="2" fill="#6366f1" opacity="0.8"/>
+            <rect x="14" y="4" width="16" height="24" rx="2" fill="#8b5cf6" opacity="0.9"/>
+            <path d="M12 16 L14 16" stroke="#a5b4fc" stroke-width="2" stroke-linecap="round"/>
+            <path d="M12 12 L18 12" stroke="#c4b5fd" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M12 20 L18 20" stroke="#c4b5fd" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">I/O Transfer Simulator</h1>
+          <p class="brand-sub">Computer Organization &amp; Architecture · Phase 1 PBL</p>
+        </div>
+      </div>
+      <div class="header-controls">
+        <div class="control-group">
+          <label for="deviceDelay">Device Delay</label>
+          <div class="slider-wrap">
+            <input type="range" id="deviceDelay" min="0.5" max="5" step="0.5" value="2" />
+            <span id="delayVal" class="mono">2.0 s</span>
+          </div>
+        </div>
+        <div class="control-group">
+          <label for="dataSize">Data Size</label>
+          <div class="slider-wrap">
+            <input type="range" id="dataSize" min="50" max="2000" step="50" value="500" />
+            <span id="sizeVal" class="mono">500 B</span>
+          </div>
+        </div>
+        <button id="runBtn" class="run-btn">
+          <span class="run-btn-icon">▶</span>
+          <span class="run-btn-text">Run Simulation</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== MAIN ===== -->
+  <main class="main">
+
+    <!-- Summary Cards -->
+    <section class="cards-row" id="summaryCards">
+      <div class="summary-card card-pio">
+        <div class="card-tag">01</div>
+        <div class="card-icon">⏳</div>
+        <h2 class="card-title">Programmed I/O</h2>
+        <p class="card-desc">CPU actively polls device until ready — busy-wait loop wastes every cycle.</p>
+        <div class="card-metrics" id="pioMetrics">
+          <div class="metric"><span class="metric-label">Latency</span><span class="metric-val" id="pioLat">—</span></div>
+          <div class="metric"><span class="metric-label">Throughput</span><span class="metric-val" id="pioThr">—</span></div>
+          <div class="metric"><span class="metric-label">CPU Avail.</span><span class="metric-val bad" id="pioCpu">—</span></div>
+        </div>
+      </div>
+
+      <div class="summary-card card-int">
+        <div class="card-tag">02</div>
+        <div class="card-icon">🔔</div>
+        <h2 class="card-title">Interrupt-driven I/O</h2>
+        <p class="card-desc">CPU does useful work; device signals completion via hardware interrupt.</p>
+        <div class="card-metrics" id="intMetrics">
+          <div class="metric"><span class="metric-label">Latency</span><span class="metric-val" id="intLat">—</span></div>
+          <div class="metric"><span class="metric-label">Throughput</span><span class="metric-val" id="intThr">—</span></div>
+          <div class="metric"><span class="metric-label">CPU Avail.</span><span class="metric-val good" id="intCpu">—</span></div>
+        </div>
+      </div>
+
+      <div class="summary-card card-dma">
+        <div class="card-tag">03</div>
+        <div class="card-icon">⚡</div>
+        <h2 class="card-title">DMA Transfer</h2>
+        <p class="card-desc">DMA controller moves data autonomously — CPU free throughout the transfer.</p>
+        <div class="card-metrics" id="dmaMetrics">
+          <div class="metric"><span class="metric-label">Latency</span><span class="metric-val" id="dmaLat">—</span></div>
+          <div class="metric"><span class="metric-label">Throughput</span><span class="metric-val" id="dmaThr">—</span></div>
+          <div class="metric"><span class="metric-label">CPU Avail.</span><span class="metric-val good" id="dmaCpu">—</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Simulation Visualizer -->
+    <section class="viz-section">
+      <h2 class="section-title">Live Simulation Visualizer</h2>
+      <div class="viz-grid">
+
+        <!-- Polling Visualizer -->
+        <div class="viz-panel" id="vizPIO">
+          <div class="viz-header">
+            <span class="viz-badge pio-badge">Polling</span>
+            <span class="viz-status" id="pioStatus">Idle</span>
+          </div>
+          <div class="bus-container">
+            <div class="bus-actor actor-cpu">
+              <div class="actor-icon">🖥️</div>
+              <div class="actor-label">CPU</div>
+              <div class="actor-state busy-state" id="pioCpuState">BUSY</div>
+            </div>
+            <div class="bus-wire">
+              <div class="bus-label">System Bus</div>
+              <div class="bus-packets" id="pioBus"></div>
+              <div class="bus-line"></div>
+            </div>
+            <div class="bus-actor actor-dev">
+              <div class="actor-icon">💾</div>
+              <div class="actor-label">Device</div>
+              <div class="actor-state" id="pioDevState">IDLE</div>
+            </div>
+          </div>
+          <div class="viz-log" id="pioLog">
+            <p class="log-placeholder">Click "Run Simulation" to start...</p>
+          </div>
+        </div>
+
+        <!-- Interrupt Visualizer -->
+        <div class="viz-panel" id="vizINT">
+          <div class="viz-header">
+            <span class="viz-badge int-badge">Interrupt</span>
+            <span class="viz-status" id="intStatus">Idle</span>
+          </div>
+          <div class="bus-container">
+            <div class="bus-actor actor-cpu">
+              <div class="actor-icon">🖥️</div>
+              <div class="actor-label">CPU</div>
+              <div class="actor-state free-state" id="intCpuState">FREE</div>
+            </div>
+            <div class="bus-wire">
+              <div class="bus-label">System Bus + IRQ Line</div>
+              <div class="bus-packets" id="intBus"></div>
+              <div class="bus-line"></div>
+            </div>
+            <div class="bus-actor actor-dev">
+              <div class="actor-icon">💾</div>
+              <div class="actor-label">Device</div>
+              <div class="actor-state" id="intDevState">IDLE</div>
+            </div>
+          </div>
+          <div class="viz-log" id="intLog">
+            <p class="log-placeholder">Click "Run Simulation" to start...</p>
+          </div>
+        </div>
+
+        <!-- DMA Visualizer -->
+        <div class="viz-panel" id="vizDMA">
+          <div class="viz-header">
+            <span class="viz-badge dma-badge">DMA</span>
+            <span class="viz-status" id="dmaStatus">Idle</span>
+          </div>
+          <div class="bus-container dma-bus">
+            <div class="bus-actor actor-cpu">
+              <div class="actor-icon">🖥️</div>
+              <div class="actor-label">CPU</div>
+              <div class="actor-state free-state" id="dmaCpuState">FREE</div>
+            </div>
+            <div class="bus-actor dma-controller">
+              <div class="actor-icon">🔄</div>
+              <div class="actor-label">DMA Ctrl</div>
+              <div class="actor-state" id="dmaCtrlState">IDLE</div>
+            </div>
+            <div class="bus-wire">
+              <div class="bus-label">Memory Bus (DMA)</div>
+              <div class="bus-packets" id="dmaBus"></div>
+              <div class="bus-line"></div>
+            </div>
+            <div class="bus-actor actor-dev">
+              <div class="actor-icon">🧠</div>
+              <div class="actor-label">Memory</div>
+              <div class="actor-state" id="dmaMemState">IDLE</div>
+            </div>
+          </div>
+          <div class="viz-log" id="dmaLog">
+            <p class="log-placeholder">Click "Run Simulation" to start...</p>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Flowchart -->
+    <section class="flowchart-section">
+      <h2 class="section-title">System Flow Diagrams</h2>
+      <div class="flowcharts-grid">
+        <div class="flowchart-panel">
+          <h3 class="flow-title pio-title">Programmed I/O Flow</h3>
+          <div class="flowchart" id="flowPIO">
+            <div class="flow-node start-node" data-step="0">CPU Issues I/O Request</div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-node" data-step="1">Read Status Register</div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-node decision-node" data-step="2">Device Ready?</div>
+            <div class="flow-branches">
+              <div class="flow-branch">
+                <div class="branch-label bad-label">No → Loop</div>
+                <div class="flow-loop">↩ Repeat Poll</div>
+              </div>
+              <div class="flow-branch">
+                <div class="branch-label">Yes</div>
+                <div class="flow-arrow">↓</div>
+              </div>
+            </div>
+            <div class="flow-node" data-step="3">CPU Reads Data</div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-node end-node" data-step="4">Resume Execution</div>
+          </div>
+        </div>
+
+        <div class="flowchart-panel">
+          <h3 class="flow-title int-title">Interrupt I/O Flow</h3>
+          <div class="flowchart" id="flowINT">
+            <div class="flow-node start-node" data-step="0">CPU Issues I/O Request</div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-node good-node" data-step="1">CPU Continues Other Work</div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-node" data-step="2">Device Raises Interrupt (IRQ)</div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-node" data-step="3">CPU Saves Context → Runs ISR</div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-node" data-step="4">ISR Reads Data into Buffer</div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-node end-node" data-step="5">Restore Context &amp; Resume</div>
+          </div>
+        </div>
+
+        <div class="flowchart-panel">
+          <h3 class="flow-title dma-title">DMA Transfer Flow</h3>
+          <div class="flowchart" id="flowDMA">
+            <div class="flow-node start-node" data-step="0">CPU Programs DMA Controller</div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-node" data-step="1">CPU Releases Bus to DMA</div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-node good-node" data-step="2">DMA Transfers Data Block</div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-node" data-step="3">DMA Raises Interrupt (Done)</div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-node" data-step="4">CPU Acknowledges Transfer</div>
+            <div class="flow-arrow">↓</div>
+            <div class="flow-node end-node" data-step="5">CPU Resumes Full Control</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Charts -->
+    <section class="charts-section">
+      <h2 class="section-title">Performance Analysis</h2>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3 class="chart-title">Latency Comparison</h3>
+          <canvas id="latencyChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3 class="chart-title">Throughput Comparison</h3>
+          <canvas id="throughputChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3 class="chart-title">CPU Availability (%)</h3>
+          <canvas id="cpuChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3 class="chart-title">Efficiency Radar</h3>
+          <canvas id="radarChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Comparison Table -->
+    <section class="table-section">
+      <h2 class="section-title">Detailed Comparison Table</h2>
+      <div class="table-wrap">
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th>Parameter</th>
+              <th class="pio-th">Programmed I/O</th>
+              <th class="int-th">Interrupt-driven I/O</th>
+              <th class="dma-th">DMA</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>CPU Role</td>
+              <td>Actively polls device status</td>
+              <td>Runs other tasks; handles ISR</td>
+              <td>Only programs DMA controller</td>
+            </tr>
+            <tr>
+              <td>CPU Availability</td>
+              <td class="bad-cell">❌ 0% — Busy Waiting</td>
+              <td class="good-cell">✅ ~100% — Free for tasks</td>
+              <td class="good-cell">✅ ~100% — Fully Free</td>
+            </tr>
+            <tr>
+              <td>Latency (Simulated)</td>
+              <td class="mono" id="tblPioLat">—</td>
+              <td class="mono" id="tblIntLat">—</td>
+              <td class="mono" id="tblDmaLat">—</td>
+            </tr>
+            <tr>
+              <td>Throughput (Simulated)</td>
+              <td class="mono" id="tblPioThr">—</td>
+              <td class="mono" id="tblIntThr">—</td>
+              <td class="mono" id="tblDmaThr">—</td>
+            </tr>
+            <tr>
+              <td>Hardware Complexity</td>
+              <td>Minimal (software-only)</td>
+              <td>Moderate (IRQ controller)</td>
+              <td>High (DMA chip + arbitration)</td>
+            </tr>
+            <tr>
+              <td>Best Use Case</td>
+              <td>Simple, slow devices</td>
+              <td>Keyboards, mice, timers</td>
+              <td>NVMe, GPU transfers, Network</td>
+            </tr>
+            <tr>
+              <td>Wasted Cycles</td>
+              <td class="bad-cell mono" id="tblPioCyc">—</td>
+              <td class="good-cell">~0</td>
+              <td class="good-cell">~0</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>COA Phase 1 PBL — I/O Data Transfer Techniques Simulation</p>
+      <p class="footer-sub">Woxsen University · Semester 4 · Computer Organization &amp; Architecture</p>
+    </footer>
+  </main>
+
+  <script src="simulation.js"></script>
+</body>
+</html>

@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html class="dark">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>I/O Transfer Simulator | COA PBL</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet" />
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: { "primary": "#7c39ef", "background-dark": "#0a0b0f", "surface": "#111318", "border-mute": "#2e2839" },
+                    fontFamily: { "display": ["Inter", "sans-serif"], "mono": ["JetBrains Mono", "monospace"] },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+    .glass{background:rgba(255,255,255,0.03);backdrop-filter:blur(12px);}
+    .neon-border-red{border:1px solid rgba(239,68,68,0.5);box-shadow:0 0 20px rgba(239,68,68,0.2);}
+    .neon-border-blue{border:1px solid rgba(59,130,246,0.5);box-shadow:0 0 20px rgba(59,130,246,0.2);}
+    .neon-border-green{border:1px solid rgba(34,197,94,0.5);box-shadow:0 0 20px rgba(34,197,94,0.2);}
+    .glowing-node-red{border:3px solid #ef4444;box-shadow:0 0 15px #ef4444;}
+    .glowing-node-blue{border:3px solid #3b82f6;box-shadow:0 0 15px #3b82f6;}
+    .glowing-node-green{border:3px solid #22c55e;box-shadow:0 0 15px #22c55e;}
+    .scanline{background:linear-gradient(to bottom,transparent 50%,rgba(0,0,0,.1) 50%),linear-gradient(to right,rgba(255,0,0,.05),rgba(0,255,0,.02),rgba(0,0,255,.05));background-size:100% 2px,3px 100%;}
+    .node-dim{opacity:0.4;}
+    .node-lit-red{border:2px solid #ef4444;box-shadow:0 0 12px #ef4444;opacity:1 !important;color:#ef4444;}
+    .node-lit-blue{border:2px solid #3b82f6;box-shadow:0 0 12px #3b82f6;opacity:1 !important;color:#60a5fa;}
+    .node-lit-green{border:2px solid #22c55e;box-shadow:0 0 12px #22c55e;opacity:1 !important;color:#4ade80;}
+  }
+</style>
+</head>
+
+<body class="bg-background-dark text-slate-100 font-display selection:bg-primary/30 min-h-screen">
+
+    <!-- HEADER -->
+    <header class="sticky top-0 z-50 w-full bg-surface/90 backdrop-blur-md border-b border-border-mute px-6 py-3">
+        <div class="max-w-[1600px] mx-auto flex flex-col lg:flex-row items-center justify-between gap-6">
+            <div class="flex items-center gap-4">
+                <div class="bg-primary/20 p-2 rounded-lg text-primary border border-primary/30">
+                    <span class="material-symbols-outlined text-2xl">memory</span>
+                </div>
+                <div>
+                    <h1 class="text-xl font-extrabold tracking-tight">I/O Transfer Simulator
+                        <span id="activeTag"
+                            class="text-slate-600 text-sm ml-2 font-mono uppercase tracking-widest hidden">[Active]</span>
+                    </h1>
+                    <p class="text-xs text-slate-400 font-medium uppercase tracking-tighter">Computer Organization &amp;
+                        Architecture · Phase 1 PBL</p>
+                </div>
+            </div>
+
+            <div class="flex flex-1 items-center justify-center gap-10 max-w-2xl">
+                <div class="flex flex-col w-full gap-1">
+                    <div class="flex justify-between text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                        <span>Device Delay</span><span id="delayLabel" class="text-primary">2.0s</span>
+                    </div>
+                    <input id="delaySlider" type="range" min="0.5" max="5" step="0.5" value="2"
+                        class="h-1.5 w-full accent-primary cursor-pointer" />
+                </div>
+                <div class="flex flex-col w-full gap-1">
+                    <div class="flex justify-between text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+                        <span>Data Size</span><span id="sizeLabel" class="text-primary">500B</span>
+                    </div>
+                    <input id="sizeSlider" type="range" min="50" max="2000" step="50" value="500"
+                        class="h-1.5 w-full accent-primary cursor-pointer" />
+                </div>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <button id="runBtn"
+                    class="bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-lg font-bold text-sm transition-all flex items-center gap-2 border border-primary/50 shadow-lg shadow-primary/30">
+                    <span class="material-symbols-outlined text-base leading-none">play_arrow</span>
+                    <span id="btnLabel">Run Simulation</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-[1600px] mx-auto p-6 space-y-8">
+
+        <!-- METRIC CARDS -->
+        <section class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- PIO -->
+            <div class="glass neon-border-red p-6 rounded-xl flex flex-col gap-4 relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 blur-3xl -mr-16 -mt-16"></div>
+                <div class="flex justify-between items-start">
+                    <div class="bg-red-500/10 p-3 rounded-lg text-red-500 border border-red-500/20">
+                        <span class="material-symbols-outlined">hourglass_empty</span>
+                    </div>
+                    <span id="pioBadge"
+                        class="text-[10px] font-bold text-red-500 uppercase tracking-widest px-2 py-1 bg-red-500/20 rounded hidden animate-pulse">Running</span>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold">Programmed I/O</h3>
+                    <p class="text-sm text-slate-400">Busy-waiting data transfer</p>
+                </div>
+                <div class="space-y-3 pt-4 border-t border-white/5 font-mono">
+                    <div class="flex justify-between text-sm"><span class="text-slate-500">Latency</span><span
+                            id="pioLat" class="text-red-400 font-bold">—</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-slate-500">Throughput</span><span
+                            id="pioThr" class="text-red-400 font-bold">—</span></div>
+                    <div class="flex justify-between text-sm font-bold"><span class="text-slate-500">CPU
+                            Availability</span><span id="pioCpu" class="text-red-500">—</span></div>
+                </div>
+            </div>
+            <!-- INT -->
+            <div class="glass neon-border-blue p-6 rounded-xl flex flex-col gap-4 relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 blur-3xl -mr-16 -mt-16"></div>
+                <div class="flex justify-between items-start">
+                    <div class="bg-blue-500/10 p-3 rounded-lg text-blue-500 border border-blue-500/20">
+                        <span class="material-symbols-outlined">notifications_active</span>
+                    </div>
+                    <span id="intBadge"
+                        class="text-[10px] font-bold text-blue-500 uppercase tracking-widest px-2 py-1 bg-blue-500/20 rounded hidden animate-pulse">Running</span>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold">Interrupt-driven I/O</h3>
+                    <p class="text-sm text-slate-400">On-demand data polling</p>
+                </div>
+                <div class="space-y-3 pt-4 border-t border-white/5 font-mono">
+                    <div class="flex justify-between text-sm"><span class="text-slate-500">Latency</span><span
+                            id="intLat" class="text-blue-400 font-bold">—</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-slate-500">Throughput</span><span
+                            id="intThr" class="text-blue-400 font-bold">—</span></div>
+                    <div class="flex justify-between text-sm font-bold"><span class="text-slate-500">CPU
+                            Availability</span><span id="intCpu" class="text-green-500">—</span></div>
+                </div>
+            </div>
+            <!-- DMA -->
+            <div class="glass neon-border-green p-6 rounded-xl flex flex-col gap-4 relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-green-500/5 blur-3xl -mr-16 -mt-16"></div>
+                <div class="flex justify-between items-start">
+                    <div class="bg-green-500/10 p-3 rounded-lg text-green-500 border border-green-500/20">
+                        <span class="material-symbols-outlined">bolt</span>
+                    </div>
+                    <span id="dmaBadge"
+                        class="text-[10px] font-bold text-green-500 uppercase tracking-widest px-2 py-1 bg-green-500/20 rounded hidden animate-pulse">Running</span>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold">DMA Transfer</h3>
+                    <p class="text-sm text-slate-400">Direct Memory Access controller</p>
+                </div>
+                <div class="space-y-3 pt-4 border-t border-white/5 font-mono">
+                    <div class="flex justify-between text-sm"><span class="text-slate-500">Latency</span><span
+                            id="dmaLat" class="text-green-400 font-bold">—</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-slate-500">Throughput</span><span
+                            id="dmaThr" class="text-green-400 font-bold">—</span></div>
+                    <div class="flex justify-between text-sm font-bold"><span class="text-slate-500">CPU
+                            Availability</span><span id="dmaCpu" class="text-green-500">—</span></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- VISUALIZER -->
+        <section>
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-bold tracking-tight">Live Simulation Visualizer</h2>
+                <div class="flex gap-4">
+                    <span class="flex items-center gap-1.5 text-[10px] text-slate-400 font-bold uppercase"><span
+                            class="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444]"></span>Busy/Polling</span>
+                    <span class="flex items-center gap-1.5 text-[10px] text-slate-400 font-bold uppercase"><span
+                            class="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_#3b82f6]"></span>ISR Active</span>
+                    <span class="flex items-center gap-1.5 text-[10px] text-slate-400 font-bold uppercase"><span
+                            class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_#22c55e]"></span>Bus Master</span>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- PIO panel -->
+                <div class="space-y-4">
+                    <div
+                        class="glass rounded-xl h-64 border border-white/5 relative overflow-hidden flex flex-col items-center justify-center bg-red-950/5">
+                        <div
+                            class="absolute inset-0 opacity-10 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:20px_20px]">
+                        </div>
+                        <div class="z-10 flex items-center gap-12">
+                            <div id="pioCpuBox"
+                                class="w-20 h-20 bg-surface border border-slate-700 rounded-lg flex flex-col items-center justify-center text-[10px] font-bold">
+                                <span class="material-symbols-outlined text-slate-400 mb-1">memory</span>
+                                STATUS:<br /><span id="pioCpuLbl" class="text-slate-400">IDLE</span>
+                            </div>
+                            <div class="relative h-1 w-24 bg-slate-800">
+                                <div id="pioPkt"
+                                    class="hidden absolute top-1/2 left-0 -translate-y-1/2 w-4 h-4 bg-red-500 rounded-full blur-[4px] shadow-red-500/50 animate-ping">
+                                </div>
+                            </div>
+                            <div id="pioDevBox"
+                                class="w-20 h-20 bg-surface border border-slate-700 rounded-lg flex flex-col items-center justify-center text-[10px] font-bold">
+                                <span class="material-symbols-outlined text-slate-400 mb-1">storage</span>
+                                <span id="pioDevLbl" class="text-slate-400">IDLE</span>
+                            </div>
+                        </div>
+                        <div id="pioBusMsg"
+                            class="absolute bottom-4 text-[10px] text-slate-600 font-mono tracking-widest font-bold">
+                            WAITING TO START</div>
+                    </div>
+                    <div id="pioLog"
+                        class="bg-black/80 rounded-lg p-3 font-mono text-[11px] text-red-400/80 h-32 overflow-y-auto border border-red-900/30 scanline space-y-0.5">
+                        <p class="text-slate-600">&gt; Idle. Press Run Simulation.</p>
+                    </div>
+                </div>
+                <!-- INT panel -->
+                <div class="space-y-4">
+                    <div
+                        class="glass rounded-xl h-64 border border-white/5 relative overflow-hidden flex flex-col items-center justify-center bg-blue-950/5">
+                        <div
+                            class="absolute inset-0 opacity-10 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:20px_20px]">
+                        </div>
+                        <div class="z-10 flex items-center gap-12">
+                            <div id="intCpuBox"
+                                class="w-20 h-20 bg-surface border border-slate-700 rounded-lg flex flex-col items-center justify-center text-[10px] font-bold">
+                                <span class="material-symbols-outlined text-slate-400 mb-1">memory</span>
+                                STATUS:<br /><span id="intCpuLbl" class="text-slate-400">IDLE</span>
+                            </div>
+                            <div class="relative h-1 w-24 bg-slate-800">
+                                <div id="intPkt"
+                                    class="hidden absolute top-1/2 right-0 -translate-y-1/2 w-4 h-4 bg-blue-400 rounded-full blur-[4px] animate-pulse">
+                                </div>
+                            </div>
+                            <div id="intDevBox"
+                                class="w-20 h-20 bg-surface border border-slate-700 rounded-lg flex flex-col items-center justify-center text-[10px] font-bold">
+                                <span class="material-symbols-outlined text-slate-400 mb-1">notifications</span>
+                                <span id="intDevLbl" class="text-slate-400">IDLE</span>
+                            </div>
+                        </div>
+                        <div id="intBusMsg"
+                            class="absolute bottom-4 text-[10px] text-slate-600 font-mono tracking-widest font-bold">
+                            WAITING TO START</div>
+                    </div>
+                    <div id="intLog"
+                        class="bg-black/80 rounded-lg p-3 font-mono text-[11px] text-blue-400/80 h-32 overflow-y-auto border border-blue-900/30 scanline space-y-0.5">
+                        <p class="text-slate-600">&gt; Idle. Press Run Simulation.</p>
+                    </div>
+                </div>
+                <!-- DMA panel -->
+                <div class="space-y-4">
+                    <div
+                        class="glass rounded-xl h-64 border border-white/5 relative overflow-hidden flex flex-col items-center justify-center bg-green-950/5">
+                        <div
+                            class="absolute inset-0 opacity-10 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:20px_20px]">
+                        </div>
+                        <div class="z-10 flex flex-col items-center gap-4">
+                            <div class="flex items-center gap-8">
+                                <div id="dmaCpuBox"
+                                    class="w-16 h-16 bg-surface border border-slate-700 rounded-lg flex flex-col items-center justify-center text-[10px] font-bold text-slate-400">
+                                    CPU</div>
+                                <div id="dmaCtrlBox"
+                                    class="w-16 h-16 bg-surface border border-slate-700 rounded-lg flex flex-col items-center justify-center text-[10px] font-bold text-slate-400">
+                                    DMAC<br /><span id="dmaCtrlLbl" class="text-[8px]">IDLE</span></div>
+                                <div id="dmaMemBox"
+                                    class="w-16 h-16 bg-surface border border-slate-700 rounded-lg flex flex-col items-center justify-center text-[10px] font-bold text-slate-400">
+                                    RAM</div>
+                            </div>
+                            <div class="h-1 w-48 bg-slate-800 relative">
+                                <div id="dmaPkt"
+                                    class="hidden absolute top-1/2 left-1/4 -translate-y-1/2 w-3 h-3 bg-green-400 rounded-full blur-[2px] animate-ping">
+                                </div>
+                            </div>
+                            <div id="dmaDevBox"
+                                class="w-16 h-16 bg-surface border border-slate-700 rounded-lg flex flex-col items-center justify-center text-[10px] font-bold text-slate-400">
+                                Device</div>
+                        </div>
+                        <div id="dmaBusMsg"
+                            class="absolute bottom-4 text-[10px] text-slate-600 font-mono tracking-widest font-bold">
+                            WAITING TO START</div>
+                    </div>
+                    <div id="dmaLog"
+                        class="bg-black/80 rounded-lg p-3 font-mono text-[11px] text-green-400/80 h-32 overflow-y-auto border border-green-900/30 scanline space-y-0.5">
+                        <p class="text-slate-600">&gt; Idle. Press Run Simulation.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FLOWCHARTS -->
+        <section>
+            <h2 class="text-xl font-bold tracking-tight mb-4">Transfer Logic Flowcharts <span
+                    class="text-xs font-mono text-slate-500 ml-2 uppercase">Tracing execution path</span></h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="flex flex-col items-center gap-3" id="flowPIO">
+                    <div class="px-4 py-2 border border-slate-700 rounded text-xs font-bold bg-surface node-dim transition-all"
+                        data-flow="pio">Issue I/O Request</div>
+                    <div class="h-5 w-px bg-slate-700"></div>
+                    <div class="px-4 py-2 border border-slate-700 rounded text-xs font-bold bg-surface node-dim transition-all"
+                        data-flow="pio">Read Status Register</div>
+                    <div class="h-5 w-px bg-slate-700"></div>
+                    <div class="px-4 py-2 border border-yellow-700/50 rounded text-xs font-bold bg-surface node-dim transition-all text-yellow-600/50"
+                        data-flow="pio">Device Ready? (Loop)</div>
+                    <div class="h-5 w-px bg-slate-700"></div>
+                    <div class="px-4 py-2 border border-slate-700 rounded text-xs font-bold bg-surface node-dim transition-all"
+                        data-flow="pio">CPU Reads Data</div>
+                    <div class="h-5 w-px bg-slate-700"></div>
+                    <div class="px-4 py-2 border border-slate-700 rounded-full text-xs font-bold bg-surface node-dim transition-all"
+                        data-flow="pio">Resume Execution</div>
+                </div>
+                <div class="flex flex-col items-center gap-3" id="flowINT">
+                    <div class="px-4 py-2 border border-slate-700 rounded text-xs font-bold bg-surface node-dim transition-all"
+                        data-flow="int">Issue I/O Command</div>
+                    <div class="h-5 w-px bg-slate-700"></div>
+                    <div class="px-4 py-2 border border-slate-700 rounded text-xs font-bold bg-surface node-dim transition-all"
+                        data-flow="int">Continue User Task</div>
+                    <div class="h-5 w-px bg-slate-700"></div>
+                    <div class="px-4 py-2 border border-slate-700 rounded text-xs font-bold bg-surface node-dim transition-all"
+                        data-flow="int">Device Raises IRQ</div>
+                    <div class="h-5 w-px bg-slate-700"></div>
+                    <div class="px-4 py-2 border border-slate-700 rounded text-xs font-bold bg-surface node-dim transition-all"
+                        data-flow="int">CPU Runs ISR</div>
+                    <div class="h-5 w-px bg-slate-700"></div>
+                    <div class="px-4 py-2 border border-slate-700 rounded-full text-xs font-bold bg-surface node-dim transition-all"
+                        data-flow="int">Restore Context &amp; Resume</div>
+                </div>
+                <div class="flex flex-col items-center gap-3" id="flowDMA">
+                    <div class="px-4 py-2 border border-slate-700 rounded text-xs font-bold bg-surface node-dim transition-all"
+                        data-flow="dma">Program DMA Controller</div>
+                    <div class="h-5 w-px bg-slate-700"></div>
+                    <div class="px-4 py-2 border border-slate-700 rounded text-xs font-bold bg-surface node-dim transition-all"
+                        data-flow="dma">CPU Releases Bus</div>
+                    <div class="h-5 w-px bg-slate-700"></div>
+                    <div class="px-4 py-2 border border-slate-700 rounded text-xs font-bold bg-surface node-dim transition-all"
+                        data-flow="dma">DMA Block Transfer</div>
+                    <div class="h-5 w-px bg-slate-700"></div>
+                    <div class="px-4 py-2 border border-slate-700 rounded text-xs font-bold bg-surface node-dim transition-all"
+                        data-flow="dma">DMA Raises Done IRQ</div>
+                    <div class="h-5 w-px bg-slate-700"></div>
+                    <div class="px-4 py-2 border border-slate-700 rounded-full text-xs font-bold bg-surface node-dim transition-all"
+                        data-flow="dma">CPU Reclaims Bus</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- PERFORMANCE CHARTS -->
+        <section>
+            <h2 class="text-xl font-bold tracking-tight mb-4">Performance Analytics <span
+                    class="text-xs font-mono text-primary ml-2 uppercase">Streaming telemetry</span></h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="glass p-5 rounded-xl border border-white/5 space-y-4">
+                    <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Latency (s)</h4>
+                    <div class="h-32 flex items-end gap-2">
+                        <div class="flex-1 flex flex-col items-center gap-1">
+                            <span id="cLatPio" class="text-[9px] text-red-400 font-mono">—</span>
+                            <div id="bLatPio"
+                                class="w-full bg-gradient-to-t from-red-600 to-red-400 rounded-t transition-all duration-1000 shadow-[0_0_10px_#ef444455]"
+                                style="height:0%"></div>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center gap-1">
+                            <span id="cLatInt" class="text-[9px] text-blue-400 font-mono">—</span>
+                            <div id="bLatInt"
+                                class="w-full bg-gradient-to-t from-blue-600 to-blue-400 rounded-t transition-all duration-1000 shadow-[0_0_10px_#3b82f655]"
+                                style="height:0%"></div>
+                        </div>
+                        <div class="flex-1 flex flex-col items-center gap-1">
+                            <span id="cLatDma" class="text-[9px] text-green-400 font-mono">—</span>
+                            <div id="bLatDma"
+                                class="w-full bg-gradient-to-t from-green-600 to-green-400 rounded-t transition-all duration-1000 shadow-[0_0_10px_#22c55e55]"
+                                style="height:0%"></div>
+                        </div>
+                    </div>
+                    <div class="flex justify-around text-[9px] text-slate-600 font-mono">
+                        <span>PIO</span><span>INT</span><span>DMA</span></div>
+                </div>
+                <div class="glass p-5 rounded-xl border border-white/5 space-y-4">
+                    <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Throughput (norm.)</h4>
+                    <div class="h-32 flex items-end gap-2">
+                        <div id="bThrPio"
+                            class="flex-1 bg-gradient-to-t from-red-600 to-red-400 rounded-t transition-all duration-1000 opacity-80"
+                            style="height:0%"></div>
+                        <div id="bThrInt"
+                            class="flex-1 bg-gradient-to-t from-blue-600 to-blue-400 rounded-t transition-all duration-1000 opacity-80"
+                            style="height:0%"></div>
+                        <div id="bThrDma"
+                            class="flex-1 bg-gradient-to-t from-green-600 to-green-400 rounded-t transition-all duration-1000 shadow-[0_0_15px_#22c55e66]"
+                            style="height:0%"></div>
+                    </div>
+                    <div class="flex justify-around text-[9px] text-slate-600 font-mono">
+                        <span>PIO</span><span>INT</span><span>DMA</span></div>
+                </div>
+                <div class="glass p-5 rounded-xl border border-white/5 space-y-4">
+                    <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">CPU Availability (%)</h4>
+                    <div class="h-32 flex items-end gap-2">
+                        <div id="bCpuPio"
+                            class="flex-1 bg-gradient-to-t from-red-600 to-red-400 rounded-t transition-all duration-1000"
+                            style="height:0%"></div>
+                        <div id="bCpuInt"
+                            class="flex-1 bg-gradient-to-t from-blue-600 to-blue-400 rounded-t transition-all duration-1000 shadow-[0_0_15px_#3b82f666]"
+                            style="height:0%"></div>
+                        <div id="bCpuDma"
+                            class="flex-1 bg-gradient-to-t from-green-600 to-green-400 rounded-t transition-all duration-1000 shadow-[0_0_15px_#22c55e66]"
+                            style="height:0%"></div>
+                    </div>
+                    <div class="flex justify-around text-[9px] text-slate-600 font-mono">
+                        <span>PIO</span><span>INT</span><span>DMA</span></div>
+                </div>
+                <div
+                    class="glass p-5 rounded-xl border border-white/5 flex flex-col items-center justify-center space-y-2 relative overflow-hidden">
+                    <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest self-start">Comparison
+                        Radar</h4>
+                    <div class="relative w-32 h-32 flex items-center justify-center">
+                        <div class="absolute inset-0 border border-slate-700/50 rounded-full"></div>
+                        <div class="absolute inset-[25%] border border-slate-700/50 rounded-full"></div>
+                        <div class="absolute inset-[50%] border border-slate-700/50 rounded-full"></div>
+                        <svg class="w-full h-full drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]" viewBox="0 0 100 100">
+                            <polygon class="fill-red-500/40 stroke-red-500 stroke-1"
+                                points="50,45 80,50 60,80 30,70 20,40" />
+                            <polygon class="fill-blue-500/40 stroke-blue-500 stroke-1"
+                                points="50,20 90,55 70,85 40,80 15,45" />
+                            <polygon class="fill-green-500/40 stroke-green-500 stroke-1"
+                                points="50,5 95,50 85,95 15,95 5,50" />
+                        </svg>
+                    </div>
+                    <span class="text-[9px] text-slate-500 font-mono">Efficiency Analysis</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- TABLE -->
+        <section class="pb-12">
+            <h2 class="text-xl font-bold tracking-tight mb-4">Detailed Technique Comparison <span
+                    class="text-xs font-mono text-slate-500 ml-2 uppercase">Live Metrics</span></h2>
+            <div class="glass rounded-xl border border-white/5 overflow-hidden shadow-2xl shadow-black/50">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-surface/80 border-b border-white/10">
+                            <th class="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                Characteristic</th>
+                            <th class="px-6 py-4 text-[10px] font-bold text-red-500 uppercase tracking-widest">
+                                Programmed I/O</th>
+                            <th class="px-6 py-4 text-[10px] font-bold text-blue-500 uppercase tracking-widest">
+                                Interrupt-Driven</th>
+                            <th class="px-6 py-4 text-[10px] font-bold text-green-500 uppercase tracking-widest">DMA
+                                Transfer</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-white/5 text-sm font-mono">
+                        <tr>
+                            <td class="px-6 py-4 font-semibold font-display text-slate-300">Latency (Observed)</td>
+                            <td id="tPioLat" class="px-6 py-4 text-red-400">—</td>
+                            <td id="tIntLat" class="px-6 py-4 text-blue-400">—</td>
+                            <td id="tDmaLat" class="px-6 py-4 text-green-400">—</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4 font-semibold font-display text-slate-300">Throughput (Live)</td>
+                            <td id="tPioThr" class="px-6 py-4 text-red-400">—</td>
+                            <td id="tIntThr" class="px-6 py-4 text-blue-400">—</td>
+                            <td id="tDmaThr" class="px-6 py-4 text-green-400">—</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4 font-semibold font-display text-slate-300">CPU Availability</td>
+                            <td class="px-6 py-4 text-red-500 bg-red-500/5">0% — Busy Wait</td>
+                            <td class="px-6 py-4 text-green-500 bg-green-500/5">~100% Free</td>
+                            <td class="px-6 py-4 text-green-500 bg-green-500/5">~100% Free</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4 font-semibold font-display text-slate-300">Overhead Type</td>
+                            <td class="px-6 py-4 text-slate-500">Wasted Poll Cycles</td>
+                            <td class="px-6 py-4 text-slate-500">IRQ Context Switch</td>
+                            <td class="px-6 py-4 text-slate-500">Bus Arbitration</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4 font-semibold font-display text-slate-300">Wasted Cycles</td>
+                            <td id="tPioCyc" class="px-6 py-4 text-red-500">—</td>
+                            <td class="px-6 py-4 text-green-500">~0</td>
+                            <td class="px-6 py-4 text-green-500">~0</td>
+                        </tr>
+                        <tr>
+                            <td class="px-6 py-4 font-semibold font-display text-slate-300">Best Use Case</td>
+                            <td class="px-6 py-4 text-slate-500">Simple slow devices</td>
+                            <td class="px-6 py-4 text-slate-500">Keyboards, timers</td>
+                            <td class="px-6 py-4 text-slate-500">NVMe, GPU, Network</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-surface py-8 border-t border-border-mute mt-auto">
+        <div class="max-w-[1600px] mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-2 text-slate-500 text-sm">
+                <span class="material-symbols-outlined text-sm">school</span>
+                <span class="font-bold tracking-tight">Computer Architecture PBL · COA</span>
+                <span id="sessionTag" class="text-[10px] bg-slate-800 px-2 py-0.5 rounded ml-2">SIM_IDLE</span>
+            </div>
+            <div class="flex gap-6">
+                <a class="text-xs font-bold text-slate-500 hover:text-primary transition-colors flex items-center gap-1"
+                    href="index.html">
+                    <span class="material-symbols-outlined text-sm">dashboard</span> Original Dashboard
+                </a>
+                <a class="text-xs font-bold text-slate-500 hover:text-primary transition-colors flex items-center gap-1"
+                    href="simulation.py">
+                    <span class="material-symbols-outlined text-sm">terminal</span> Python Script
+                </a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        'use strict';
+        const $ = id => document.getElementById(id);
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+        const fmtS = n => n.toFixed(2) + 's';
+        const fmtThr = n => n > 1e6 ? (n / 1e6).toFixed(1) + 'M B/s' : n > 1000 ? (n / 1000).toFixed(0) + 'K B/s' : n.toFixed(0) + ' B/s';
+
+        // Sliders
+        $('delaySlider').addEventListener('input', e => { $('delayLabel').textContent = parseFloat(e.target.value).toFixed(1) + 's'; });
+        $('sizeSlider').addEventListener('input', e => { $('sizeLabel').textContent = parseInt(e.target.value) + 'B'; });
+
+        function logLine(id, color, msg) {
+            const el = $(id);
+            if (el.querySelector('.text-slate-600')) el.innerHTML = '';
+            const p = document.createElement('p');
+            p.className = 'text-' + color + '-400/90';
+            p.textContent = '> ' + msg;
+            el.appendChild(p);
+            el.scrollTop = el.scrollHeight;
+        }
+        function setBox(id, color, label) {
+            const el = $(id);
+            if (!el) return;
+            el.className = el.className.replace(/border-\S+/g, '').replace(/shadow-\S+\]/g, '');
+            if (color === 'red') el.classList.add('border-red-500/80', 'shadow-lg', 'shadow-red-500/20');
+            else if (color === 'blue') el.classList.add('border-blue-500/80', 'shadow-lg', 'shadow-blue-500/20');
+            else if (color === 'green') el.classList.add('border-green-500/80', 'shadow-lg', 'shadow-green-500/20');
+            else el.classList.add('border-slate-700');
+            if (label !== undefined) {
+                const lbl = el.querySelector('[id$="CpuLbl"],[id$="DevLbl"],[id$="CtrlLbl"],[id^="dmaCtrlLbl"]');
+                if (lbl) { lbl.textContent = label; lbl.className = 'text-' + (color || 'slate') + '-400'; }
+            }
+        }
+
+        // Flowchart animation
+        async function animateFlow(type, steps, delay) {
+            const nodes = document.querySelectorAll(`[data-flow="${type}"]`);
+            const cls = { pio: 'node-lit-red', int: 'node-lit-blue', dma: 'node-lit-green' }[type];
+            nodes.forEach(n => { n.classList.remove('node-lit-red', 'node-lit-blue', 'node-lit-green'); n.classList.add('node-dim'); });
+            for (let i = 0; i < Math.min(steps, nodes.length); i++) {
+                await sleep(delay * 1000 / (nodes.length + 1));
+                nodes[i].classList.remove('node-dim');
+                nodes[i].classList.add(cls);
+            }
+        }
+
+        // PIO Simulation
+        async function simPIO(delay, dataSize) {
+            const TICK = 50; let cycles = 0;
+            const dataBytes = dataSize * 4;
+            const start = performance.now();
+            $('pioBadge').classList.remove('hidden');
+            $('pioBusMsg').textContent = 'CONTINUOUS BUSY WAITING LOOP';
+            $('pioBusMsg').className = 'absolute bottom-4 text-[10px] text-red-500 font-mono animate-pulse tracking-widest font-bold';
+            $('pioCpuLbl').textContent = 'POLLING'; $('pioCpuLbl').className = 'text-red-400';
+            $('pioCpuBox').classList.add('border-red-500/80');
+            $('pioDevLbl').textContent = 'BUSY';
+            $('pioPkt').classList.remove('hidden');
+            logLine('pioLog', 'red', 'CPU issues I/O request to device');
+            const deadline = start + delay * 1000;
+            while (performance.now() < deadline) {
+                cycles++;
+                if (cycles === 1 || cycles % 20 === 0) logLine('pioLog', 'red', `Poll #${cycles} — status: NOT READY`);
+                await sleep(TICK);
+            }
+            $('pioPkt').classList.add('hidden');
+            $('pioDevLbl').textContent = 'READY'; $('pioDevLbl').className = 'text-green-400';
+            logLine('pioLog', 'red', `Device READY after ${cycles} polls!`);
+            await sleep(120);
+            logLine('pioLog', 'slate', `CPU reads ${dataBytes} bytes into register`);
+            $('pioCpuLbl').textContent = 'DONE'; $('pioCpuLbl').className = 'text-green-400';
+            $('pioBadge').classList.add('hidden');
+            $('pioBusMsg').textContent = 'TRANSFER COMPLETE';
+            $('pioBusMsg').className = 'absolute bottom-4 text-[10px] text-green-500 font-mono tracking-widest font-bold';
+            const elapsed = (performance.now() - start) / 1000;
+            return { latency: elapsed, throughput: dataBytes / elapsed, cycles, cpuAvail: 0 };
+        }
+
+        // INT Simulation
+        async function simINT(delay, dataSize) {
+            const dataBytes = dataSize * 4;
+            const start = performance.now();
+            $('intBadge').classList.remove('hidden');
+            $('intCpuLbl').textContent = 'FREE'; $('intCpuLbl').className = 'text-green-400';
+            $('intCpuBox').classList.add('border-green-500/80');
+            $('intDevLbl').textContent = 'BUSY';
+            $('intBusMsg').textContent = 'CPU EXECUTING USER TASKS';
+            $('intBusMsg').className = 'absolute bottom-4 text-[10px] text-blue-400 font-mono tracking-widest font-bold';
+            logLine('intLog', 'blue', 'CPU issues I/O request, resumes user tasks');
+            $('intPkt').classList.remove('hidden');
+            const tick = Math.max(delay * 250, 400);
+            let count = 0;
+            const wid = setInterval(() => {
+                count++;
+                const msgs = ['CPU: running user process...', 'Thread 0x021: compute_shader_v2', 'Background task: render_pipeline', 'CPU: executing user task...'];
+                logLine('intLog', 'blue', msgs[count % msgs.length]);
+            }, tick);
+            await sleep(delay * 1000);
+            clearInterval(wid);
+            $('intPkt').classList.add('hidden');
+            $('intDevLbl').textContent = 'IRQ↑'; $('intDevLbl').className = 'text-blue-400';
+            $('intDevBox').classList.add('border-blue-500/80');
+            logLine('intLog', 'blue', '🔔 Hardware INTERRUPT raised (IRQ)!');
+            logLine('intLog', 'slate', 'CPU saves context → jumps to ISR');
+            $('intCpuLbl').textContent = 'ISR'; $('intCpuLbl').className = 'text-blue-400';
+            await sleep(300);
+            logLine('intLog', 'blue', `ISR reads ${dataBytes} bytes into buffer`);
+            await sleep(150);
+            logLine('intLog', 'slate', 'CPU restores context, resumes execution');
+            $('intCpuLbl').textContent = 'DONE'; $('intCpuLbl').className = 'text-green-400';
+            $('intDevLbl').textContent = 'DONE'; $('intDevLbl').className = 'text-green-400';
+            $('intBadge').classList.add('hidden');
+            $('intBusMsg').textContent = 'TRANSFER COMPLETE';
+            $('intBusMsg').className = 'absolute bottom-4 text-[10px] text-green-500 font-mono tracking-widest font-bold';
+            const elapsed = (performance.now() - start) / 1000;
+            return { latency: elapsed, throughput: dataBytes / elapsed, cycles: 0, cpuAvail: 100 };
+        }
+
+        // DMA Simulation
+        async function simDMA(delay, dataSize) {
+            const dataBytes = dataSize * 4;
+            const start = performance.now();
+            $('dmaBadge').classList.remove('hidden');
+            logLine('dmaLog', 'green', `CPU programs DMA: dst=RAM, len=${dataBytes}`);
+            $('dmaCpuBox').classList.add('border-slate-500');
+            $('dmaCtrlLbl').textContent = 'PROG';
+            await sleep(200);
+            logLine('dmaLog', 'green', 'CPU surrenders system bus to DMA controller');
+            $('dmaCtrlBox').classList.add('border-green-500', 'shadow-[0_0_20px_#22c55e44]', 'text-green-400');
+            $('dmaCtrlLbl').textContent = 'XFER'; $('dmaCtrlLbl').className = 'text-[8px] animate-pulse text-green-400';
+            $('dmaCpuBox').classList.add('border-slate-600'); $('dmaCpuBox').textContent = 'CPU\nFREE';
+            $('dmaPkt').classList.remove('hidden');
+            $('dmaBusMsg').textContent = 'BUS MASTER: DMAC';
+            $('dmaBusMsg').className = 'absolute bottom-4 text-[10px] text-green-500 font-mono tracking-widest font-bold';
+            const bursts = Math.ceil(delay / 0.4);
+            for (let i = 0; i < bursts; i++) {
+                await sleep(delay * 1000 / bursts);
+                const pct = Math.round(((i + 1) / bursts) * 100);
+                logLine('dmaLog', 'green', `DMA burst ${i + 1}/${bursts} → ${pct}% transferred`);
+            }
+            $('dmaPkt').classList.add('hidden');
+            $('dmaMemBox').classList.add('border-green-500/80', 'text-green-400');
+            logLine('dmaLog', 'green', '✅ DMA done — raises completion interrupt');
+            $('dmaCtrlLbl').textContent = 'DONE';
+            await sleep(200);
+            logLine('dmaLog', 'slate', 'CPU acknowledges, reclaims bus');
+            $('dmaBadge').classList.add('hidden');
+            $('dmaBusMsg').textContent = 'TRANSFER COMPLETE';
+            const elapsed = (performance.now() - start) / 1000;
+            return { latency: elapsed, throughput: dataBytes / elapsed, cycles: 0, cpuAvail: 100 };
+        }
+
+        function updateCards(pio, int_, dma) {
+            $('pioLat').textContent = fmtS(pio.latency); $('pioThr').textContent = fmtThr(pio.throughput); $('pioCpu').textContent = pio.cpuAvail + '%';
+            $('intLat').textContent = fmtS(int_.latency); $('intThr').textContent = fmtThr(int_.throughput); $('intCpu').textContent = int_.cpuAvail + '%';
+            $('dmaLat').textContent = fmtS(dma.latency); $('dmaThr').textContent = fmtThr(dma.throughput); $('dmaCpu').textContent = dma.cpuAvail + '%';
+            $('tPioLat').textContent = fmtS(pio.latency); $('tIntLat').textContent = fmtS(int_.latency); $('tDmaLat').textContent = fmtS(dma.latency);
+            $('tPioThr').textContent = fmtThr(pio.throughput); $('tIntThr').textContent = fmtThr(int_.throughput); $('tDmaThr').textContent = fmtThr(dma.throughput);
+            $('tPioCyc').textContent = pio.cycles.toLocaleString();
+        }
+
+        function updateCharts(pio, int_, dma) {
+            // Latency bars (relative to max)
+            const maxLat = Math.max(pio.latency, int_.latency, dma.latency) || 1;
+            $('bLatPio').style.height = Math.round((pio.latency / maxLat) * 100) + '%'; $('cLatPio').textContent = fmtS(pio.latency);
+            $('bLatInt').style.height = Math.round((int_.latency / maxLat) * 100) + '%'; $('cLatInt').textContent = fmtS(int_.latency);
+            $('bLatDma').style.height = Math.round((dma.latency / maxLat) * 100) + '%'; $('cLatDma').textContent = fmtS(dma.latency);
+            // Throughput bars
+            const maxThr = Math.max(pio.throughput, int_.throughput, dma.throughput) || 1;
+            $('bThrPio').style.height = Math.round((pio.throughput / maxThr) * 100) + '%';
+            $('bThrInt').style.height = Math.round((int_.throughput / maxThr) * 100) + '%';
+            $('bThrDma').style.height = Math.round((dma.throughput / maxThr) * 100) + '%';
+            // CPU Avail bars
+            $('bCpuPio').style.height = pio.cpuAvail + '%';
+            $('bCpuInt').style.height = int_.cpuAvail + '%';
+            $('bCpuDma').style.height = dma.cpuAvail + '%';
+        }
+
+        function setRunning(on) {
+            const btn = $('runBtn'); const lbl = $('btnLabel');
+            $('activeTag').classList.toggle('hidden', !on);
+            $('activeTag').className = on ? 'text-primary text-sm ml-2 font-mono uppercase tracking-widest' : 'hidden';
+            $('sessionTag').textContent = on ? 'SIM_SESSION_ACTIVE' : 'SIM_IDLE';
+            if (on) {
+                btn.disabled = true;
+                btn.className = 'bg-slate-800 text-slate-500 px-6 py-2.5 rounded-lg font-bold text-sm flex items-center gap-2 cursor-not-allowed border border-white/5';
+                btn.innerHTML = `<svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor"/></svg><span>Simulating…</span>`;
+            } else {
+                btn.disabled = false;
+                btn.className = 'bg-primary hover:bg-primary/90 text-white px-6 py-2.5 rounded-lg font-bold text-sm transition-all flex items-center gap-2 border border-primary/50 shadow-lg shadow-primary/30';
+                btn.innerHTML = `<span class="material-symbols-outlined text-base leading-none">play_arrow</span><span>Run Simulation</span>`;
+            }
+        }
+
+        $('runBtn').addEventListener('click', async () => {
+            const delay = parseFloat($('delaySlider').value);
+            const dataSize = parseInt($('sizeSlider').value);
+            setRunning(true);
+            // reset logs
+            $('pioLog').innerHTML = ''; $('intLog').innerHTML = ''; $('dmaLog').innerHTML = '';
+            // reset flow nodes
+            document.querySelectorAll('[data-flow]').forEach(n => { n.classList.remove('node-lit-red', 'node-lit-blue', 'node-lit-green'); n.classList.add('node-dim'); });
+
+            const [pio, int_, dma] = await Promise.all([
+                (async () => { animateFlow('pio', 5, delay); return simPIO(delay, dataSize); })(),
+                (async () => { animateFlow('int', 5, delay); return simINT(delay, dataSize); })(),
+                (async () => { animateFlow('dma', 5, delay); return simDMA(delay, dataSize); })(),
+            ]);
+
+            updateCards(pio, int_, dma);
+            updateCharts(pio, int_, dma);
+            setRunning(false);
+            console.table({
+                'Programmed I/O': { Latency: fmtS(pio.latency), Throughput: fmtThr(pio.throughput), Cycles: pio.cycles },
+                'Interrupt I/O': { Latency: fmtS(int_.latency), Throughput: fmtThr(int_.throughput), Cycles: 0 },
+                'DMA': { Latency: fmtS(dma.latency), Throughput: fmtThr(dma.throughput), Cycles: 0 },
+            });
+        });
+    </script>
+</body>
+
+</html>
