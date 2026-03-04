@@ -40,8 +40,11 @@ export async function simInterruptIO(delay, dataSize, onLog, onState) {
 
     let count = 0;
     const wid = setInterval(() => { count++; onLog(userMsgs[count % userMsgs.length]); }, Math.max(delay * 250, 400));
-    await sleep(delay * 1000);
-    clearInterval(wid);
+    try {
+        await sleep(delay * 1000);
+    } finally {
+        clearInterval(wid);
+    }
 
     onState({ cpuLbl: 'ISR', cpuColor: 'blue', devLbl: 'IRQ↑', devColor: 'blue', pktVisible: false });
     onLog('🔔 Hardware INTERRUPT raised (IRQ)!');

@@ -81,13 +81,6 @@ export default function App() {
 
   const maxThr = Math.max(...TECH_KEYS.map(k => results[k]?.throughput ?? 0), 0.001)
 
-  const barDef = (key, gradient, shadow, labelCls) => ({
-    value: results[key]?.latency ?? 0,
-    displayVal: results[key]?.latency.toFixed(2) ?? null,
-    shortLabel: key.toUpperCase(),
-    gradient, shadow, labelCls,
-  })
-
   return (
     <div className="dark min-h-screen bg-bg-dark text-slate-100 font-display selection:bg-primary/30">
       <Header delay={delay} dataSize={dataSize}
@@ -147,20 +140,20 @@ export default function App() {
             <span className="text-xs font-mono text-primary ml-2 uppercase">Streaming telemetry</span>
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <BarChart title="Latency (s)" unit="s" bars={[
-              { value: results.pio?.latency ?? 0, displayVal: results.pio?.latency.toFixed(2), shortLabel: 'PIO', gradient: 'bg-gradient-to-t from-red-600 to-red-400', shadow: 'shadow-[0_0_12px_#ef444460]', labelCls: 'text-red-400' },
-              { value: results.int?.latency ?? 0, displayVal: results.int?.latency.toFixed(2), shortLabel: 'INT', gradient: 'bg-gradient-to-t from-blue-600 to-blue-400', shadow: 'shadow-[0_0_12px_#3b82f660]', labelCls: 'text-blue-400' },
-              { value: results.dma?.latency ?? 0, displayVal: results.dma?.latency.toFixed(2), shortLabel: 'DMA', gradient: 'bg-gradient-to-t from-green-600 to-green-400', shadow: 'shadow-[0_0_12px_#22c55e60]', labelCls: 'text-green-400' },
+            <BarChart title="Latency (s)" bars={[
+              { value: results.pio?.latency ?? 0, displayVal: results.pio?.latency.toFixed(2), shortLabel: 'PIO', color: '#ef4444' },
+              { value: results.int?.latency ?? 0, displayVal: results.int?.latency.toFixed(2), shortLabel: 'INT', color: '#3b82f6' },
+              { value: results.dma?.latency ?? 0, displayVal: results.dma?.latency.toFixed(2), shortLabel: 'DMA', color: '#22c55e' },
             ]} />
             <BarChart title="Throughput" bars={[
-              { value: results.pio?.throughput ?? 0, displayVal: results.pio ? fmtThr(results.pio.throughput) : null, shortLabel: 'PIO', gradient: 'bg-gradient-to-t from-red-600 to-red-400', shadow: 'shadow-[0_0_12px_#ef444460]', labelCls: 'text-red-400' },
-              { value: results.int?.throughput ?? 0, displayVal: results.int ? fmtThr(results.int.throughput) : null, shortLabel: 'INT', gradient: 'bg-gradient-to-t from-blue-600 to-blue-400', shadow: 'shadow-[0_0_12px_#3b82f660]', labelCls: 'text-blue-400' },
-              { value: results.dma?.throughput ?? 0, displayVal: results.dma ? fmtThr(results.dma.throughput) : null, shortLabel: 'DMA', gradient: 'bg-gradient-to-t from-green-600 to-green-400', shadow: 'shadow-[0_0_15px_#22c55e80]', labelCls: 'text-green-400' },
+              { value: results.pio?.throughput ?? 0, displayVal: results.pio ? fmtThr(results.pio.throughput) : null, shortLabel: 'PIO', color: '#ef4444' },
+              { value: results.int?.throughput ?? 0, displayVal: results.int ? fmtThr(results.int.throughput) : null, shortLabel: 'INT', color: '#3b82f6' },
+              { value: results.dma?.throughput ?? 0, displayVal: results.dma ? fmtThr(results.dma.throughput) : null, shortLabel: 'DMA', color: '#22c55e' },
             ]} />
-            <BarChart title="CPU Availability (%)" unit="%" bars={[
-              { value: results.pio?.cpuAvail ?? 0, displayVal: results.pio?.cpuAvail + '%', shortLabel: 'PIO', gradient: 'bg-gradient-to-t from-red-800 to-red-500', shadow: '', labelCls: 'text-red-400' },
-              { value: results.int?.cpuAvail ?? 0, displayVal: results.int?.cpuAvail + '%', shortLabel: 'INT', gradient: 'bg-gradient-to-t from-blue-600 to-blue-400', shadow: 'shadow-[0_0_15px_#3b82f666]', labelCls: 'text-blue-400' },
-              { value: results.dma?.cpuAvail ?? 0, displayVal: results.dma?.cpuAvail + '%', shortLabel: 'DMA', gradient: 'bg-gradient-to-t from-green-600 to-green-400', shadow: 'shadow-[0_0_15px_#22c55e66]', labelCls: 'text-green-400' },
+            <BarChart title="CPU Availability (%)" bars={[
+              { value: results.pio?.cpuAvail ?? 0, displayVal: results.pio != null ? results.pio.cpuAvail + '%' : null, shortLabel: 'PIO', color: '#ef4444' },
+              { value: results.int?.cpuAvail ?? 0, displayVal: results.int != null ? results.int.cpuAvail + '%' : null, shortLabel: 'INT', color: '#3b82f6' },
+              { value: results.dma?.cpuAvail ?? 0, displayVal: results.dma != null ? results.dma.cpuAvail + '%' : null, shortLabel: 'DMA', color: '#22c55e' },
             ]} />
             <RadarChart results={results} />
           </div>
